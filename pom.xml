@@ -20,7 +20,7 @@
   <properties>
     <java.version>21</java.version>
     <serverless.container.version>2.1.5</serverless.container.version>
-    <jacoco.plugin.version>0.8.13</jacoco.plugin.version>
+    <jacoco.plugin.version>0.8.15</jacoco.plugin.version>
     <!-- A classe main nao e exercitada nos testes; fora da cobertura -->
     <sonar.coverage.exclusions>**/Application.java</sonar.coverage.exclusions>
   </properties>
