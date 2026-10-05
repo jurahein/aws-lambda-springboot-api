@@ -39,7 +39,7 @@ jobs:
             -Dsonar.projectKey="jurahein"
 
       - name: Guardar o pacote do Lambda
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: lambda-package
           path: target/aws-lambda-springboot-api.jar
