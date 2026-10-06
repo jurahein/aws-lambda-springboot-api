@@ -32,6 +32,9 @@ jobs:
       - name: Build, testes e analise Sonar
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          AWS_REGION: us-east-1
+          AWS_DEPLOY_ROLE_ARN: arn:aws:iam::360734035729:role/github-actions-lambda-deploy
+          LAMBDA_FUNCTION_NAME: aws-lambda-springboot-api-dev          
         run: |
           mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
             -Dsonar.host.url=https://sonarcloud.io \
@@ -83,3 +86,43 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/dependency-review-action@v4
+
+
+  deploy:
+    name: Deploy no Lambda
+    needs: [build-and-sonar, codeql, secrets-scan]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: lambda-package
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Publicar codigo no Lambda
+        run: |
+          aws lambda update-function-code \
+            --function-name "$LAMBDA_FUNCTION_NAME" \
+            --zip-file fileb://aws-lambda-springboot-api.jar
+          aws lambda wait function-updated --function-name "$LAMBDA_FUNCTION_NAME"
+
+      - name: Smoke test
+        run: |
+          API_URL=$(aws apigatewayv2 get-apis \
+            --query "Items[?Name=='${LAMBDA_FUNCTION_NAME}-http'].ApiEndpoint | [0]" \
+            --output text)
+          echo "API: $API_URL"
+          for i in 1 2 3 4 5 6; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "$API_URL/health" || true)
+            echo "tentativa $i: HTTP $code"
+            [ "$code" = "200" ] && exit 0
+            sleep 10
+          done
+          exit 1      
